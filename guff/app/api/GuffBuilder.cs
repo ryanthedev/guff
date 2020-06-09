@@ -13,6 +13,7 @@ namespace guff
             FullMode = BoundedChannelFullMode.Wait,
             AllowSynchronousContinuations = true,
             SingleReader = true,
+            SingleWriter = false,
         });
 
         public static void Init()
@@ -28,28 +29,31 @@ namespace guff
             };
 
             var reader = _logPipe.Reader;
-            Task.Run(async () =>
+            var dtPattern = "yyyy-MM-ddTHH:mm:ss.fffffffK";
+            for(var i = 0; i < Environment.ProcessorCount; i++)
             {
-                var dtPattern = "yyyy-MM-ddTHH:mm:ss.fffffffK";
-                while (await reader.WaitToReadAsync())
+                Task.Run(async () =>
                 {
-                    while (reader.TryRead(out var item))
+                    while (await reader.WaitToReadAsync())
                     {
-                        try
+                        while (reader.TryRead(out var item))
                         {
-                            Console.WriteLine(DateTimeOffset.UtcNow.ToString(dtPattern) + " - " + JsonSerializer.Serialize(item, jsonOptions));
-                        } 
-                        catch(Exception e)
-                        {
-                            Console.WriteLine(e.Message);
+                            try
+                            {
+                                Console.WriteLine(DateTimeOffset.UtcNow.ToString(dtPattern) + " - " + JsonSerializer.Serialize(item, jsonOptions));
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine(e.Message);
+                            }
                         }
-                    }
-                        
-                }
 
-                Console.WriteLine("channel good bye");
-                    
-            });
+                    }
+
+                    Console.WriteLine("channel good bye");
+
+                });
+            }            
         }
 
         public static IGuffLogger<T> Build<T>() where T : class

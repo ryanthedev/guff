@@ -17,64 +17,94 @@ namespace guff
             _inputSource = typeof(T).ToString();
         }
 
-        public void Debug(object metaData)
+        public void Debug(string message, object metaData)
         {
-            writeLog("debug", metaData);
+            writeLog("debug", message, metaData);
         }
 
-        public void Error(object metaData)
+        public void Debug(string message)
         {
-            writeLog("error", metaData);
+            Debug(message, null);
         }
 
-        public void Info(dynamic metaData)
+        public void Error(string message, object metaData)
         {
-            writeLog("info", metaData);
+            writeLog("error", message, metaData);
         }
 
-        public void Pub(string severity, object metaData)
+        public void Error(Exception e, string message, object metaData)
         {
-            writeLog(severity, metaData);
+            writeLog("error", message, metaData, e);
         }
 
-        public void Trace(object metaData)
+        public void Error(string message)
         {
-            writeLog("trace", metaData);
+            Error(message, null);
         }
 
-        public void Warn(object metaData)
+        public void Info(string message, object metaData)
         {
-            writeLog("warn", metaData);
+            writeLog("info", message, metaData);
         }
 
-        internal void writeLog(string severity, object metaData)
+        public void Info(string message)
+        {
+            Info(message, null);
+        }
+
+        public void Pub(string severity, string message, object metaData)
+        {
+            writeLog(severity, message, metaData);
+        }
+
+        public void Pub(string severity, string message)
+        {
+            Pub(severity, message, null);
+        }
+
+        public void Trace(string message, object metaData)
+        {
+            writeLog("trace", message, metaData);
+        }
+
+        public void Trace(string message)
+        {
+            Trace(message, null);
+        }
+
+        public void Warn(string message, object metaData)
+        {
+            writeLog("warn", message, metaData);
+        }
+
+        public void Warn(string message)
+        {
+            Warn(message, null);
+        }
+
+        internal void writeLog(string severity, string message, object metaData, Exception error = null)
         {
             var gei = InterlockedEx.Increment(ref __logIndex);
             var evt = new LogEvent()
             {
                 GlobalEventIndex = gei,
-                EventSource = _inputSource,
+                Message = message,
+                Logger = _inputSource,
                 MetaData = metaData,
                 ThreadId = Thread.CurrentThread.ManagedThreadId,
                 EventTimeStamp = DateTimeOffset.UtcNow,
-                Severity = severity
+                Severity = severity,
+                Error = error
             };
             bool ok;
             do
             {
                 ok = _downstream.TryWrite(evt);
+                //don't kill the cpu
                 if (!ok)
-                    Thread.Sleep(1);
-                else
-                    break;
+                    _downstream.WaitToWriteAsync().AsTask().Wait();
 
-                ok = _downstream.TryWrite(evt);
             } while (!ok);
-        }
-
-        public void Error(Exception e, object metaData)
-        {
-            throw new NotImplementedException();
-        }
+        }      
     }
 }
